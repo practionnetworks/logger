@@ -82,26 +82,7 @@ func InitLogger(config Config) {
 	}
 
 	// Convert log level string to zerolog.Level
-	var logLevel zerolog.Level
-	switch strings.ToLower(config.LogLevel) {
-	case "debug":
-		logLevel = zerolog.DebugLevel
-	case "info":
-		logLevel = zerolog.InfoLevel
-	case "warn":
-		logLevel = zerolog.WarnLevel
-	case "error":
-		logLevel = zerolog.ErrorLevel
-	case "fatal":
-		logLevel = zerolog.FatalLevel
-	case "panic":
-		logLevel = zerolog.PanicLevel
-	case "trace":
-		logLevel = zerolog.TraceLevel
-	default:
-		// Default to Info if no valid log level is provided
-		logLevel = zerolog.InfoLevel
-	}
+	logLevel := parseLogLevel(config.LogLevel)
 
 	// Initialize logger with JSON formatter
 	log.Logger = zerolog.New(multiWriter).With().
@@ -116,104 +97,192 @@ func InitLogger(config Config) {
 
 	initialized = true
 }
-func Info(message string, fields ...Field) {
-	event := log.Info()
-	for _, field := range fields {
-		event = event.Str(field.Key, field.Value)
+
+func parseLogLevel(level string) zerolog.Level {
+	switch strings.ToUpper(level) {
+	case "DEBUG":
+		return zerolog.DebugLevel
+	case "INFO":
+		return zerolog.InfoLevel
+	case "WARN":
+		return zerolog.WarnLevel
+	case "ERROR":
+		return zerolog.ErrorLevel
+	case "FATAL":
+		return zerolog.FatalLevel
+	case "PANIC":
+		return zerolog.PanicLevel
+	case "TRACE":
+		return zerolog.TraceLevel
+	default:
+		return zerolog.InfoLevel
+	}
+}
+func logWithFields(level zerolog.Level, message string, fields ...interface{}) {
+	event := log.WithLevel(level)
+	if len(fields)%2 != 0 {
+		event = event.Interface("fields_error", "uneven number of key-value pairs")
+	} else {
+		for i := 0; i < len(fields); i += 2 {
+			key, okKey := fields[i].(string)
+			value, okValue := fields[i+1].(string)
+			if okKey && okValue {
+				event = event.Str(key, value)
+			} else {
+				event = event.Interface("fields_error", "key-value pairs must be strings")
+				break
+			}
+		}
 	}
 	event.Msg(message)
 }
 
-func Debug(message string, fields ...Field) {
-	event := log.Debug()
-	for _, field := range fields {
-		event = event.Str(field.Key, field.Value)
-	}
-	event.Msg(message)
+func Info(message string, fields ...interface{}) {
+	logWithFields(zerolog.InfoLevel, message, fields...)
 }
 
-func Warn(message string, fields ...Field) {
-	event := log.Warn()
-	for _, field := range fields {
-		event = event.Str(field.Key, field.Value)
-	}
-	event.Msg(message)
+func Debug(message string, fields ...interface{}) {
+	logWithFields(zerolog.DebugLevel, message, fields...)
 }
 
-func Error(message string, fields ...Field) {
-	event := log.Error()
-	for _, field := range fields {
-		event = event.Str(field.Key, field.Value)
-	}
-	event.Msg(message)
+func Warn(message string, fields ...interface{}) {
+	logWithFields(zerolog.WarnLevel, message, fields...)
 }
 
-func Fatal(message string, fields ...Field) {
-	event := log.Fatal()
-	for _, field := range fields {
-		event = event.Str(field.Key, field.Value)
-	}
-	event.Msg(message)
+func Error(message string, fields ...interface{}) {
+	logWithFields(zerolog.ErrorLevel, message, fields...)
 }
 
-func Panic(message string, fields ...Field) {
-	event := log.Panic()
-	for _, field := range fields {
-		event = event.Str(field.Key, field.Value)
-	}
-	event.Msg(message)
+func Fatal(message string, fields ...interface{}) {
+	logWithFields(zerolog.FatalLevel, message, fields...)
 }
 
-func Trace(message string, fields ...Field) {
-	event := log.Trace()
-	for _, field := range fields {
-		event = event.Str(field.Key, field.Value)
-	}
-	event.Msg(message)
+func Panic(message string, fields ...interface{}) {
+	logWithFields(zerolog.PanicLevel, message, fields...)
 }
 
-func WarnWithError(err error, fields ...Field) {
-	event := log.Warn().Stack().Err(errors.WithStack(err))
-	for _, field := range fields {
-		event = event.Str(field.Key, field.Value)
-	}
-	event.Msg(err.Error())
+func Trace(message string, fields ...interface{}) {
+	logWithFields(zerolog.TraceLevel, message, fields...)
 }
 
-func ErrorWithError(err error, fields ...Field) {
-	event := log.Error().Stack().Err(errors.WithStack(err))
-	for _, field := range fields {
-		event = event.Str(field.Key, field.Value)
-	}
-	event.Msg(err.Error())
+func WarnWithError(err error, fields ...interface{}) {
+	logWithFields(zerolog.WarnLevel, err.Error(), append(fields, "error", errors.WithStack(err))...)
 }
 
-func FatalWithError(err error, fields ...Field) {
-	event := log.Fatal().Stack().Err(errors.WithStack(err))
-	for _, field := range fields {
-		event = event.Str(field.Key, field.Value)
-	}
-	event.Msg(err.Error())
+func ErrorWithError(err error, fields ...interface{}) {
+	logWithFields(zerolog.ErrorLevel, err.Error(), append(fields, "error", errors.WithStack(err))...)
 }
 
-func PanicWithError(err error, fields ...Field) {
-	event := log.Panic().Stack().Err(errors.WithStack(err))
-	for _, field := range fields {
-		event = event.Str(field.Key, field.Value)
-	}
-	event.Msg(err.Error())
+func FatalWithError(err error, fields ...interface{}) {
+	logWithFields(zerolog.FatalLevel, err.Error(), append(fields, "error", errors.WithStack(err))...)
 }
 
-func TraceWithError(err error, fields ...Field) {
-	event := log.Trace().Stack().Err(errors.WithStack(err))
-	for _, field := range fields {
-		event = event.Str(field.Key, field.Value)
-	}
-	event.Msg(err.Error())
+func PanicWithError(err error, fields ...interface{}) {
+	logWithFields(zerolog.PanicLevel, err.Error(), append(fields, "error", errors.WithStack(err))...)
 }
 
-// Field represents a key-value pair for structured logging
-type Field struct {
-	Key   string
-	Value string
+func TraceWithError(err error, fields ...interface{}) {
+	logWithFields(zerolog.TraceLevel, err.Error(), append(fields, "error", errors.WithStack(err))...)
 }
+
+// func Info(message string, fields ...Field) {
+// 	event := log.Info()
+// 	for _, field := range fields {
+// 		event = event.Str(field.Key, field.Value)
+// 	}
+// 	event.Msg(message)
+// }
+
+// func Debug(message string, fields ...Field) {
+// 	event := log.Debug()
+// 	for _, field := range fields {
+// 		event = event.Str(field.Key, field.Value)
+// 	}
+// 	event.Msg(message)
+// }
+
+// func Warn(message string, fields ...Field) {
+// 	event := log.Warn()
+// 	for _, field := range fields {
+// 		event = event.Str(field.Key, field.Value)
+// 	}
+// 	event.Msg(message)
+// }
+
+// func Error(message string, fields ...Field) {
+// 	event := log.Error()
+// 	for _, field := range fields {
+// 		event = event.Str(field.Key, field.Value)
+// 	}
+// 	event.Msg(message)
+// }
+
+// func Fatal(message string, fields ...Field) {
+// 	event := log.Fatal()
+// 	for _, field := range fields {
+// 		event = event.Str(field.Key, field.Value)
+// 	}
+// 	event.Msg(message)
+// }
+
+// func Panic(message string, fields ...Field) {
+// 	event := log.Panic()
+// 	for _, field := range fields {
+// 		event = event.Str(field.Key, field.Value)
+// 	}
+// 	event.Msg(message)
+// }
+
+// func Trace(message string, fields ...Field) {
+// 	event := log.Trace()
+// 	for _, field := range fields {
+// 		event = event.Str(field.Key, field.Value)
+// 	}
+// 	event.Msg(message)
+// }
+
+// func WarnWithError(err error, fields ...Field) {
+// 	event := log.Warn().Stack().Err(errors.WithStack(err))
+// 	for _, field := range fields {
+// 		event = event.Str(field.Key, field.Value)
+// 	}
+// 	event.Msg(err.Error())
+// }
+
+// func ErrorWithError(err error, fields ...Field) {
+// 	event := log.Error().Stack().Err(errors.WithStack(err))
+// 	for _, field := range fields {
+// 		event = event.Str(field.Key, field.Value)
+// 	}
+// 	event.Msg(err.Error())
+// }
+
+// func FatalWithError(err error, fields ...Field) {
+// 	event := log.Fatal().Stack().Err(errors.WithStack(err))
+// 	for _, field := range fields {
+// 		event = event.Str(field.Key, field.Value)
+// 	}
+// 	event.Msg(err.Error())
+// }
+
+// func PanicWithError(err error, fields ...Field) {
+// 	event := log.Panic().Stack().Err(errors.WithStack(err))
+// 	for _, field := range fields {
+// 		event = event.Str(field.Key, field.Value)
+// 	}
+// 	event.Msg(err.Error())
+// }
+
+// func TraceWithError(err error, fields ...Field) {
+// 	event := log.Trace().Stack().Err(errors.WithStack(err))
+// 	for _, field := range fields {
+// 		event = event.Str(field.Key, field.Value)
+// 	}
+// 	event.Msg(err.Error())
+// }
+
+// // Field represents a key-value pair for structured logging
+// type Field struct {
+// 	Key   string
+// 	Value string
+// }
