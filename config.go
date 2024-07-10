@@ -29,9 +29,9 @@ func NewLogger(serviceName string, console bool, pod string, logFilePath string,
 		ServiceName:        serviceName,
 		Pod:                pod,
 		LogLevel:           logLevel,
-		Console:            console,
-		LogFilePath:        logFilePath,
 		LogAnalyserAddress: logAnalyserAddress,
 		LogAnalyserEnabled: LogAnalyserEnabled,
+		Console:            console,
+		LogFilePath:        logFilePath,
 	}, nil
 }
