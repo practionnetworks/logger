@@ -4,6 +4,7 @@ package logger
 
 import (
 	"io"
+	"net"
 	"os"
 	"strings"
 	"time"
@@ -14,6 +15,23 @@ import (
 )
 
 var initialized bool
+
+type LogstashWriter struct {
+	conn net.Conn
+}
+
+func NewLogstashWriter(network, address string) (*LogstashWriter, error) {
+	conn, err := net.Dial(network, address)
+
+	if err != nil {
+		return nil, err
+	}
+	return &LogstashWriter{conn: conn}, nil
+}
+
+func (w *LogstashWriter) Write(p []byte) (n int, err error) {
+	return w.conn.Write(p)
+}
 
 func InitLogger(config Config) {
 	if initialized {
@@ -27,7 +45,9 @@ func InitLogger(config Config) {
 
 	// Add console output if enabled
 	if config.Console {
-		writers = append(writers, zerolog.ConsoleWriter{Out: os.Stdout, TimeFormat: time.RFC3339}) // Disable ANSI escape codes
+		// writers = append(writers, zerolog.ConsoleWriter{Out: os.Stdout, TimeFormat: time.RFC3339}) // Disable ANSI escape codes
+
+		writers = append(writers, os.Stdout)
 	}
 
 	// Add file output if provided
@@ -42,9 +62,14 @@ func InitLogger(config Config) {
 		log.Logger = log.Logger.Output(file)
 	}
 
-	// Add log analyzer output if provided
-	if config.LogAnalyser != nil {
-		writers = append(writers, config.LogAnalyser)
+	if config.LogAnalyserEnabled {
+		logstashWriter, err := NewLogstashWriter("tcp", config.LogAnalyserAddress)
+
+		if err != nil {
+			log.Fatal().Err(err).Msg("Failed to create Logstash writer")
+		}
+
+		writers = append(writers, logstashWriter)
 	}
 
 	// Use MultiWriter to combine outputs
@@ -91,51 +116,104 @@ func InitLogger(config Config) {
 
 	initialized = true
 }
-
-func Info(message string) {
-	log.Info().Msg(message)
+func Info(message string, fields ...Field) {
+	event := log.Info()
+	for _, field := range fields {
+		event = event.Str(field.Key, field.Value)
+	}
+	event.Msg(message)
 }
 
-func Debug(message string) {
-	log.Debug().Msg(message)
+func Debug(message string, fields ...Field) {
+	event := log.Debug()
+	for _, field := range fields {
+		event = event.Str(field.Key, field.Value)
+	}
+	event.Msg(message)
 }
 
-func Warn(message string) {
-	log.Warn().Msg(message)
+func Warn(message string, fields ...Field) {
+	event := log.Warn()
+	for _, field := range fields {
+		event = event.Str(field.Key, field.Value)
+	}
+	event.Msg(message)
 }
 
-func Error(message string) {
-	log.Error().Msg(message)
+func Error(message string, fields ...Field) {
+	event := log.Error()
+	for _, field := range fields {
+		event = event.Str(field.Key, field.Value)
+	}
+	event.Msg(message)
 }
 
-func Fatal(message string) {
-	log.Fatal().Msg(message)
+func Fatal(message string, fields ...Field) {
+	event := log.Fatal()
+	for _, field := range fields {
+		event = event.Str(field.Key, field.Value)
+	}
+	event.Msg(message)
 }
 
-func Panic(message string) {
-	log.Panic().Msg(message)
+func Panic(message string, fields ...Field) {
+	event := log.Panic()
+	for _, field := range fields {
+		event = event.Str(field.Key, field.Value)
+	}
+	event.Msg(message)
 }
 
-func Trace(message string) {
-	log.Trace().Msg(message)
+func Trace(message string, fields ...Field) {
+	event := log.Trace()
+	for _, field := range fields {
+		event = event.Str(field.Key, field.Value)
+	}
+	event.Msg(message)
 }
 
-func WarnWithError(err error) {
-	log.Warn().Stack().Err(errors.WithStack(err)).Msg(err.Error())
+func WarnWithError(err error, fields ...Field) {
+	event := log.Warn().Stack().Err(errors.WithStack(err))
+	for _, field := range fields {
+		event = event.Str(field.Key, field.Value)
+	}
+	event.Msg(err.Error())
 }
 
-func ErrorWithError(err error) {
-	log.Error().Stack().Err(errors.WithStack(err)).Msg(err.Error())
+func ErrorWithError(err error, fields ...Field) {
+	event := log.Error().Stack().Err(errors.WithStack(err))
+	for _, field := range fields {
+		event = event.Str(field.Key, field.Value)
+	}
+	event.Msg(err.Error())
 }
 
-func FatalWithError(err error) {
-	log.Fatal().Stack().Err(errors.WithStack(err)).Msg(err.Error())
+func FatalWithError(err error, fields ...Field) {
+	event := log.Fatal().Stack().Err(errors.WithStack(err))
+	for _, field := range fields {
+		event = event.Str(field.Key, field.Value)
+	}
+	event.Msg(err.Error())
 }
 
-func PanicWithError(err error) {
-	log.Panic().Stack().Err(errors.WithStack(err)).Msg(err.Error())
+func PanicWithError(err error, fields ...Field) {
+	event := log.Panic().Stack().Err(errors.WithStack(err))
+	for _, field := range fields {
+		event = event.Str(field.Key, field.Value)
+	}
+	event.Msg(err.Error())
 }
 
-func TraceWithError(err error) {
-	log.Trace().Stack().Err(errors.WithStack(err)).Msg(err.Error())
+func TraceWithError(err error, fields ...Field) {
+	event := log.Trace().Stack().Err(errors.WithStack(err))
+	for _, field := range fields {
+		event = event.Str(field.Key, field.Value)
+	}
+	event.Msg(err.Error())
+}
+
+// Field represents a key-value pair for structured logging
+type Field struct {
+	Key   string
+	Value string
 }
