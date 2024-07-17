@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 )
@@ -88,9 +89,9 @@ func InitLogger(config Config) {
 	log.Logger = zerolog.New(multiWriter).With().
 		Timestamp().
 		Str("service", config.ServiceName).
-		Str("pod", config.Pod).
+		Str("pod", config.PodName).
 		Int("pid", os.Getpid()).
-		CallerWithSkipFrameCount(3).
+		CallerWithSkipFrameCount(4).
 		Logger().
 		Level(logLevel).
 		Output(multiWriter) // Use multiWriter for output
@@ -120,6 +121,7 @@ func parseLogLevel(level string) zerolog.Level {
 }
 func logWithFields(level zerolog.Level, message string, fields ...interface{}) {
 	event := log.WithLevel(level)
+
 	if len(fields)%2 != 0 {
 		event = event.Interface("fields_error", "uneven number of key-value pairs")
 	} else {
